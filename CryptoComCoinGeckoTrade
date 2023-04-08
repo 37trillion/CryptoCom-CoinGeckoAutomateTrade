@@ -1,0 +1,62 @@
+import time
+import requests
+import pandas as pd
+import ccxt
+from pycoingecko import CoinGeckoAPI
+
+# Replace with your Crypto.com/exchange API keys
+api_key = 'Your API Key Here'
+api_secret = 'Your API Key Here'
+
+cg = CoinGeckoAPI()
+exchange = ccxt.cryptocom()
+
+def get_btc_usd_price():
+    btc_usd_data = cg.get_price(ids='bitcoin', vs_currencies='usd')
+    return btc_usd_data['bitcoin']['usd']
+
+def place_order(side, amount, price):
+    symbol = 'BTC/USDT'
+    order_type = 'limit'
+
+    if side == 'BUY':
+        side = exchange.create_order(symbol, order_type, side.lower(), amount, price)
+    elif side == 'SELL':
+        side = exchange.create_order(symbol, order_type, side.lower(), amount, price)
+
+    print(f"{side} order placed: {amount} BTC at ${price}")
+
+def calculate_sma(prices, window):
+    return pd.Series(prices).rolling(window=window).mean().iloc[-1]
+
+def main():
+    print("Collecting data for 5 minutes...")
+    start_time = time.time()
+    data_points = []
+
+    while time.time() - start_time < 300:
+        price = get_btc_usd_price()
+        data_points.append(price)
+        time.sleep(60)
+
+    print("Data collection completed.")
+    
+    sma_short_window = 5
+    sma_long_window = 10
+    in_position = False
+
+    for i in range(len(data_points) - sma_long_window):
+        sma_short = calculate_sma(data_points[i:i+sma_short_window], sma_short_window)
+        sma_long = calculate_sma(data_points[i:i+sma_long_window], sma_long_window)
+
+        if sma_short > sma_long and not in_position:
+            print("Buy Signal")
+            place_order("BUY", 0.0001, data_points[i+sma_long_window])
+            in_position = True
+        elif sma_short < sma_long and in_position:
+            print("Sell Signal")
+            place_order("SELL", 0.0001, data_points[i+sma_long_window])
+            in_position = False
+
+if __name__ == "__main__":
+    main()
